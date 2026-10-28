@@ -1,0 +1,89 @@
+services:
+  frontend:
+    build: ./frontend
+    image: lab4-course-frontend
+    container_name: course-frontend
+    ports:
+      - "${FRONTEND_PORT}:80"
+    depends_on:
+      - backend
+    networks:
+      - backend-network
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    image: lab4-course-backend
+    container_name: course-backend
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://cache:6379
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    networks:
+      - backend-network
+      - database-network
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.4
+    container_name: course-database
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h localhost -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - database-network
+    restart: unless-stopped
+
+  # Bonus: Redis cache for GET /api/courses (only the backend can reach it)
+  cache:
+    image: redis:7-alpine
+    container_name: course-cache
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - database-network
+    restart: unless-stopped
+
+  # Bonus: Adminer, published on 127.0.0.1 only (not reachable from other machines)
+  adminer:
+    image: adminer:4.8.1
+    container_name: course-adminer
+    ports:
+      - "127.0.0.1:${ADMINER_PORT}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+    networks:
+      - database-network
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+
+networks:
+  backend-network:
+  database-network:

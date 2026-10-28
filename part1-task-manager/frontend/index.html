@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docker Multi-Tier Lab</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px;
+           margin: 40px auto; padding: 0 16px; }
+    input { width: 65%; padding: 8px; }
+    button { padding: 8px 12px; cursor: pointer; }
+    li { margin: 10px 0; }
+    #message { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>Cloud Computing Lab 4</h1>
+  <h2>Task Management Application</h2>
+  <p>Frontend: Nginx | Backend: Python Flask | Database: MySQL</p>
+
+  <form id="task-form">
+    <input id="task-title" type="text" placeholder="Enter a task" required>
+    <button type="submit">Add Task</button>
+  </form>
+
+  <h3>Tasks</h3>
+  <ul id="tasks"></ul>
+  <p id="message"></p>
+
+  <script>
+    const taskList = document.getElementById("tasks");
+    const message = document.getElementById("message");
+
+    async function loadTasks() {
+      try {
+        const response = await fetch("/api/tasks");
+        if (!response.ok) throw new Error("Could not load tasks");
+        const tasks = await response.json();
+        taskList.replaceChildren();
+        tasks.forEach(task => {
+          const item = document.createElement("li");
+          const text = document.createElement("span");
+          const del = document.createElement("button");
+          text.textContent = task.title + " ";
+          del.textContent = "Delete";
+          del.addEventListener("click", async () => {
+            const result = await fetch("/api/tasks/" + task.id, { method: "DELETE" });
+            if (!result.ok) message.textContent = "Could not delete the task";
+            loadTasks();
+          });
+          item.append(text, del);
+          taskList.appendChild(item);
+        });
+        message.textContent = "";
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    }
+
+    document.getElementById("task-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const input = document.getElementById("task-title");
+      const title = input.value.trim();
+      if (!title) return;
+      try {
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title })
+        });
+        if (!response.ok) throw new Error("Could not add task");
+        input.value = "";
+        await loadTasks();
+      } catch (error) {
+        message.textContent = error.message;
+      }
+    });
+
+    loadTasks();
+  </script>
+</body>
+</html>
